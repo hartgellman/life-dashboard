@@ -1,0 +1,30 @@
+name: Daily Life Dashboard
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # 7:00 AM ET (UTC-5) / adjusts for daylight saving
+  workflow_dispatch:  # allows manual trigger
+
+jobs:
+  run-dashboard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run dashboard
+        env:
+          GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
+          GROUPME_TOKEN: ${{ secrets.GROUPME_TOKEN }}
+          GOOGLE_DOC_ID: ${{ secrets.GOOGLE_DOC_ID }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: python main.py
