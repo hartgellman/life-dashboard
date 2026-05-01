@@ -392,6 +392,60 @@ with tab_week:
             loc = f" · 📍 {event['LOCATION']}" if event['LOCATION'] else ""
             st.markdown(f"- **{time_str}** — {event['SUMMARY']}{loc}")
 
+    st.divider()
+    st.subheader("Coming Up (2-4 Weeks Out)")
+    st.caption("Events that may need preparation")
+
+    lookahead_events = run_query(f"""
+        SELECT SUMMARY, 
+               CONVERT_TIMEZONE('{USER_TZ}', START_TIME)::TIMESTAMP_NTZ AS START_TIME,
+               LOCATION, CALENDAR_NAME
+        FROM {DB_SCHEMA}.EVENTS
+        WHERE START_TIME BETWEEN DATEADD('day', 7, CURRENT_TIMESTAMP()) 
+              AND DATEADD('day', 28, CURRENT_TIMESTAMP())
+        ORDER BY START_TIME
+    """)
+
+    if lookahead_events.empty:
+        st.info("Nothing on the horizon")
+    else:
+        lookahead_text = ""
+        for _, e in lookahead_events.iterrows():
+            event_day = pd.Timestamp(e['START_TIME']).strftime('%A %b %d')
+            loc = f" at {e['LOCATION']}" if e['LOCATION'] else ""
+            lookahead_text += f"- {e['SUMMARY']} | {event_day}{loc}\n"
+
+        lookahead_summary = cortex_complete(f"""Review these upcoming events (2-4 weeks from now) and identify ONLY those that require Hart to prepare or take action beforehand.
+
+EVENTS THAT NEED ACTION (include these):
+- Kids' birthday parties (need to buy a gift, RSVP)
+- Travel/flights (need to pack, arrange pet/house care, confirm reservations)
+- Hosting at our home (need supplies, food, cleaning)
+- School events: field days, performances, publishing parties (may need supplies, costumes, volunteer sign-up)
+- Holidays like Mother's Day, Father's Day (need gift/plans)
+
+EVENTS THAT DON'T NEED ACTION (exclude these):
+- Lauren's tennis matches or sports she plays
+- Regular recurring family syncs
+- Watching sports (Kentucky Derby, etc.)
+- Regular kids' soccer practice
+- Someone else's dinner/plans Hart isn't organizing
+
+For each event needing action, write ONE bullet: the event name, date, and what prep is likely needed.
+If nothing needs prep, say "Nothing requiring preparation in the next 2-4 weeks."
+
+Today is {now.strftime('%A, %B %d, %Y')}.
+
+EVENTS:
+{lookahead_text[:3000]}
+
+HEADS UP:""")
+
+        if lookahead_summary and lookahead_summary.strip():
+            st.markdown(lookahead_summary)
+        else:
+            st.info("Nothing requiring preparation in the next 2-4 weeks.")
+
 with tab_messages:
     st.subheader("GroupMe Highlights")
     st.caption("AI-extracted updates from your group chats")
