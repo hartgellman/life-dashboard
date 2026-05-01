@@ -308,14 +308,16 @@ with tab_today:
 
         school_summary = cortex_complete(f"""You are Hart Gellman's assistant summarizing school emails from Monte Cassino (his kids Harrison and Hunter attend there).
 
-Summarize the key points from these recent school emails. Focus on:
-- Upcoming events, deadlines, or dates parents need to know
-- Action items (forms to fill out, supplies to bring, sign-ups needed, volunteer requests)
-- Health/nurse visits (briefly note what happened)
-- Schedule changes or important announcements
+Give Hart a useful summary of what's happening at school. Include:
+- What the kids are learning or working on in class
+- What activities or events happened this week
+- Upcoming events, dates, or deadlines parents should know about
+- Health/nurse visits (briefly note what happened and if follow-up is needed)
+- Any fun highlights or achievements
 
-Format as concise bullet points grouped by topic. Skip Facebook notifications and social media updates.
-If an email requires Hart to DO something, start that bullet with "ACTION:" so it stands out.
+If an email explicitly asks Hart to DO something (RSVP, bring supplies, fill out a form, volunteer), start that bullet with "ACTION:" and include the specific details/deadline.
+
+Format: concise bullet points, grouped logically. Skip Facebook notifications and vague social media updates.
 
 Today is {now.strftime('%A, %B %d, %Y')}.
 
