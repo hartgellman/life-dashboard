@@ -650,71 +650,75 @@ with tab_ask:
         with st.chat_message("user"):
             st.write(prompt)
 
-        context_events = run_query(f"""
-            SELECT SUMMARY, 
-                   CONVERT_TIMEZONE('{USER_TZ}', START_TIME)::TIMESTAMP_NTZ AS START_TIME,
-                   CONVERT_TIMEZONE('{USER_TZ}', END_TIME)::TIMESTAMP_NTZ AS END_TIME,
-                   LOCATION, CALENDAR_NAME
-            FROM {DB_SCHEMA}.EVENTS
-            WHERE START_TIME BETWEEN CURRENT_TIMESTAMP() AND DATEADD('day', 14, CURRENT_TIMESTAMP())
-            ORDER BY START_TIME
-        """)
+        with st.spinner("Looking up your data..."):
+            context_events = run_query(f"""
+                SELECT SUMMARY, 
+                       CONVERT_TIMEZONE('{USER_TZ}', START_TIME)::TIMESTAMP_NTZ AS START_TIME,
+                       CONVERT_TIMEZONE('{USER_TZ}', END_TIME)::TIMESTAMP_NTZ AS END_TIME,
+                       LOCATION, CALENDAR_NAME
+                FROM {DB_SCHEMA}.EVENTS
+                WHERE START_TIME BETWEEN CURRENT_TIMESTAMP() AND DATEADD('day', 42, CURRENT_TIMESTAMP())
+                ORDER BY START_TIME
+            """)
 
-        context_str = f"TODAY: {now.strftime('%A, %B %d, %Y')} (Central Time)\n\n"
-        context_str += "CALENDAR EVENTS (next 2 weeks):\n"
-        if not context_events.empty:
-            for _, e in context_events.iterrows():
-                event_day = pd.Timestamp(e['START_TIME']).strftime('%A %b %d')
-                event_time = pd.Timestamp(e['START_TIME']).strftime('%I:%M %p')
-                loc = f" at {e['LOCATION']}" if e['LOCATION'] else ""
-                context_str += f"- {e['SUMMARY']} | {event_day} {event_time}{loc} | Calendar: {e['CALENDAR_NAME']}\n"
-        else:
-            context_str += "- No upcoming events\n"
+            context_str = f"TODAY: {now.strftime('%A, %B %d, %Y')} (Central Time)\n\n"
+            context_str += "CALENDAR EVENTS (next 6 weeks):\n"
+            if not context_events.empty:
+                for _, e in context_events.iterrows():
+                    event_day = pd.Timestamp(e['START_TIME']).strftime('%A %b %d')
+                    event_time = pd.Timestamp(e['START_TIME']).strftime('%I:%M %p')
+                    loc = f" at {e['LOCATION']}" if e['LOCATION'] else ""
+                    context_str += f"- {e['SUMMARY']} | {event_day} {event_time}{loc} | Calendar: {e['CALENDAR_NAME']}\n"
+            else:
+                context_str += "- No upcoming events\n"
 
-        context_emails = run_query(f"""
-            SELECT SENDER, SUBJECT, SNIPPET FROM {DB_SCHEMA}.EMAILS 
-            ORDER BY LOADED_AT DESC LIMIT 15
-        """)
-        context_str += "\nRECENT EMAILS:\n"
-        if not context_emails.empty:
-            for _, e in context_emails.iterrows():
-                sender = str(e['SENDER']).split('<')[0].strip()
-                context_str += f"- From {sender}: {e['SUBJECT']} — {str(e['SNIPPET'])[:150]}\n"
+            context_emails = run_query(f"""
+                SELECT SENDER, SUBJECT, SNIPPET FROM {DB_SCHEMA}.EMAILS 
+                ORDER BY LOADED_AT DESC LIMIT 15
+            """)
+            context_str += "\nRECENT EMAILS:\n"
+            if not context_emails.empty:
+                for _, e in context_emails.iterrows():
+                    sender = str(e['SENDER']).split('<')[0].strip()
+                    context_str += f"- From {sender}: {e['SUBJECT']} — {str(e['SNIPPET'])[:150]}\n"
 
-        context_messages = run_query(f"""
-            SELECT GROUP_NAME, SENDER_NAME, MESSAGE_TEXT, SENT_AT
-            FROM {DB_SCHEMA}.GROUPME_MESSAGES
-            ORDER BY SENT_AT DESC LIMIT 20
-        """)
-        context_str += "\nGROUPME MESSAGES (recent):\n"
-        if not context_messages.empty:
-            for _, m in context_messages.iterrows():
-                msg_time = pd.Timestamp(m['SENT_AT']).strftime('%b %d %I:%M %p') if m['SENT_AT'] else ""
-                context_str += f"- [{m['GROUP_NAME']}] {m['SENDER_NAME']} ({msg_time}): {str(m['MESSAGE_TEXT'])[:100]}\n"
+            context_messages = run_query(f"""
+                SELECT GROUP_NAME, SENDER_NAME, MESSAGE_TEXT, SENT_AT
+                FROM {DB_SCHEMA}.GROUPME_MESSAGES
+                ORDER BY SENT_AT DESC LIMIT 20
+            """)
+            context_str += "\nGROUPME MESSAGES (recent):\n"
+            if not context_messages.empty:
+                for _, m in context_messages.iterrows():
+                    msg_time = pd.Timestamp(m['SENT_AT']).strftime('%b %d %I:%M %p') if m['SENT_AT'] else ""
+                    context_str += f"- [{m['GROUP_NAME']}] {m['SENDER_NAME']} ({msg_time}): {str(m['MESSAGE_TEXT'])[:100]}\n"
 
-        context_actions = run_query(f"""
-            SELECT TITLE, PRIORITY, DUE_DATE FROM {DB_SCHEMA}.ACTION_ITEMS 
-            WHERE STATUS = 'PENDING' ORDER BY CREATED_AT DESC LIMIT 10
-        """)
-        context_str += "\nPENDING ACTION ITEMS:\n"
-        if not context_actions.empty:
-            for _, a in context_actions.iterrows():
-                due = f" (due {a['DUE_DATE']})" if a['DUE_DATE'] else ""
-                context_str += f"- [{a['PRIORITY']}] {a['TITLE']}{due}\n"
+            context_actions = run_query(f"""
+                SELECT TITLE, PRIORITY, DUE_DATE FROM {DB_SCHEMA}.ACTION_ITEMS 
+                WHERE STATUS = 'PENDING' ORDER BY CREATED_AT DESC LIMIT 10
+            """)
+            context_str += "\nPENDING ACTION ITEMS:\n"
+            if not context_actions.empty:
+                for _, a in context_actions.iterrows():
+                    due = f" (due {a['DUE_DATE']})" if a['DUE_DATE'] else ""
+                    context_str += f"- [{a['PRIORITY']}] {a['TITLE']}{due}\n"
 
-        context_school = run_query(f"""
-            SELECT SENDER, SUBJECT, COALESCE(BODY, SNIPPET) AS CONTENT FROM {DB_SCHEMA}.SCHOOL_EMAILS 
-            ORDER BY RECEIVED_AT DESC LIMIT 10
-        """)
-        context_str += "\nSCHOOL EMAILS (Monte Cassino - recent):\n"
-        if not context_school.empty:
-            for _, s in context_school.iterrows():
-                sender = str(s['SENDER']).split('<')[0].strip()
-                context_str += f"- From {sender}: {s['SUBJECT']} — {str(s['CONTENT'])[:250]}\n"
+            context_school = run_query(f"""
+                SELECT SENDER, SUBJECT, COALESCE(BODY, SNIPPET) AS CONTENT FROM {DB_SCHEMA}.SCHOOL_EMAILS 
+                ORDER BY RECEIVED_AT DESC LIMIT 10
+            """)
+            context_str += "\nSCHOOL EMAILS (Monte Cassino - recent):\n"
+            if not context_school.empty:
+                for _, s in context_school.iterrows():
+                    sender = str(s['SENDER']).split('<')[0].strip()
+                    context_str += f"- From {sender}: {s['SUBJECT']} — {str(s['CONTENT'])[:250]}\n"
+
+        with st.status("Thinking...", expanded=True) as status:
+            st.write("Searching your calendar, emails, and messages...")
+            response = ask_ai(prompt, context_str)
+            status.update(label="Done", state="complete", expanded=False)
 
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                response = ask_ai(prompt, context_str)
             st.write(response)
 
         st.session_state.chat_messages.append({"role": "assistant", "content": response})
