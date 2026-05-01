@@ -457,29 +457,41 @@ with tab_week:
             loc = f" at {e['LOCATION']}" if e['LOCATION'] else ""
             lookahead_text += f"- {e['SUMMARY']} | {event_day}{loc}\n"
 
-        lookahead_summary = cortex_complete(f"""Review these upcoming events (2-4 weeks from now) and identify ONLY those that require Hart to prepare or take action beforehand.
+        school_context = run_query(f"""
+            SELECT SUBJECT, COALESCE(BODY, SNIPPET) AS CONTENT 
+            FROM {DB_SCHEMA}.SCHOOL_EMAILS 
+            ORDER BY RECEIVED_AT DESC LIMIT 10
+        """)
+        school_text = ""
+        if not school_context.empty:
+            for _, s in school_context.iterrows():
+                school_text += f"- {s['SUBJECT']}: {str(s['CONTENT'])[:300]}\n"
 
-EVENTS THAT NEED ACTION (include these):
-- Kids' birthday parties (need to buy a gift, RSVP)
-- Travel/flights (need to pack, arrange pet/house care, confirm reservations)
-- Hosting at our home (need supplies, food, cleaning)
-- School events: field days, performances, publishing parties (may need supplies, costumes, volunteer sign-up)
-- Holidays like Mother's Day, Father's Day (need gift/plans)
+        lookahead_summary = cortex_complete(f"""Review these upcoming events (2-4 weeks from now) for Hart Gellman. His kids Harrison and Hunter attend Monte Cassino school.
 
-EVENTS THAT DON'T NEED ACTION (exclude these):
-- Lauren's tennis matches or sports she plays
-- Regular recurring family syncs
-- Watching sports (Kentucky Derby, etc.)
-- Regular kids' soccer practice
-- Someone else's dinner/plans Hart isn't organizing
+Identify events that require preparation and tell Hart SPECIFICALLY what he needs to do. Use the school emails below to find details about school events (supplies needed, volunteer sign-ups, deadlines, etc.).
 
-For each event needing action, write ONE bullet: the event name, date, and what prep is likely needed.
-If nothing needs prep, say "Nothing requiring preparation in the next 2-4 weeks."
+EVENTS THAT NEED ACTION:
+- Kids' birthday parties → buy a gift, RSVP
+- Travel/flights → just note the trip
+- Hosting → supplies, food
+- School events (field days, performances) → check school emails for specific requirements (supplies, costumes, volunteer needs). If emails don't mention requirements, say "No details sent yet"
+- Holidays (Mother's Day, Father's Day) → gift/plans
+
+EVENTS TO SKIP: Lauren's tennis, recurring syncs, watching sports, regular practice
+
+RULES:
+- Be SPECIFIC. Don't say "check if supplies are needed" — instead say what's needed or "no details sent yet about supplies"
+- If school emails mention something relevant to an event, include those details
+- One bullet per event: name, date, and the specific prep needed (or "no details yet")
 
 Today is {now.strftime('%A, %B %d, %Y')}.
 
 EVENTS:
-{lookahead_text[:3000]}
+{lookahead_text[:2500]}
+
+SCHOOL EMAILS (for context on school events):
+{school_text[:2000]}
 
 HEADS UP:""")
 
