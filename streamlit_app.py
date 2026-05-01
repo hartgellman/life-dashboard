@@ -326,21 +326,44 @@ with tab_today:
                 st.caption(event['CALENDAR_NAME'])
 
     st.divider()
-    st.subheader("Recent Emails")
+    st.subheader("Email Highlights")
     emails = run_query(f"""
         SELECT SENDER, SUBJECT, SNIPPET
         FROM {DB_SCHEMA}.EMAILS
         ORDER BY LOADED_AT DESC
-        LIMIT 8
+        LIMIT 20
     """)
 
     if emails.empty:
         st.info("No recent emails")
     else:
+        email_text = ""
         for _, email in emails.iterrows():
             sender = str(email['SENDER']).split('<')[0].strip()
-            with st.expander(f"**{sender}** — {email['SUBJECT']}"):
-                st.write(email['SNIPPET'])
+            email_text += f"From: {sender} | Subject: {email['SUBJECT']} | Preview: {str(email['SNIPPET'])[:200]}\n"
+
+        email_summary = cortex_complete(f"""You are Hart Gellman's personal email assistant. Review these emails and extract ONLY what matters.
+
+PRIORITY SENDERS (always surface these):
+- Monte Cassino (school) - any email about events, schedules, deadlines, or announcements
+- Schools, teachers, coaches
+- Family members
+- Medical/health appointments
+
+IGNORE: Marketing, promotions, newsletters, spam, security alerts from apps
+
+For each important email, write one bullet point summarizing the key info or action needed.
+If no emails are important, say "Nothing requiring attention."
+
+EMAILS:
+{email_text[:3000]}
+
+IMPORTANT HIGHLIGHTS (bullet points only):""")
+
+        if email_summary and email_summary.strip():
+            st.markdown(email_summary)
+        else:
+            st.info("Nothing requiring attention in recent emails.")
 
 with tab_week:
     st.subheader("Next 7 Days")
@@ -370,25 +393,58 @@ with tab_week:
             st.markdown(f"- **{time_str}** — {event['SUMMARY']}{loc}")
 
 with tab_messages:
-    st.subheader("GroupMe Updates (Last 48h)")
+    st.subheader("GroupMe Highlights")
+    st.caption("AI-extracted updates from your group chats")
     messages = run_query(f"""
         SELECT GROUP_NAME, SENDER_NAME, MESSAGE_TEXT, LIKES_COUNT, SENT_AT
         FROM {DB_SCHEMA}.GROUPME_MESSAGES
         ORDER BY SENT_AT DESC
-        LIMIT 50
+        LIMIT 60
     """)
 
     if messages.empty:
         st.info("No recent messages")
     else:
-        groups = messages['GROUP_NAME'].unique()
-        for group in groups:
-            group_msgs = messages[messages['GROUP_NAME'] == group]
-            with st.expander(f"**{group}** ({len(group_msgs)} messages)"):
+        msg_text = ""
+        for _, msg in messages.iterrows():
+            time_str = pd.Timestamp(msg['SENT_AT']).strftime('%b %d %I:%M %p') if msg['SENT_AT'] else ""
+            msg_text += f"[{msg['GROUP_NAME']}] {msg['SENDER_NAME']} ({time_str}): {str(msg['MESSAGE_TEXT'])[:150]}\n"
+
+        groupme_summary = cortex_complete(f"""You are Hart Gellman's personal assistant reviewing GroupMe messages from parent groups, family chats, and friend groups.
+
+EXTRACT ONLY messages about:
+- Schedule changes (practice cancelled, game moved, time change)
+- New events or activities announced
+- Teacher/staff birthdays or appreciation days
+- RSVPs needed or deadlines
+- Important logistics (carpool changes, aftercare updates, field assignments)
+- Party/event planning that requires action
+
+IGNORE: Casual chat, "thank you" messages, reactions, expired polls, general banter
+
+Format as bullet points grouped by topic. Include the group name and key details.
+If nothing noteworthy, say "No important updates from group chats."
+
+MESSAGES:
+{msg_text[:3500]}
+
+KEY UPDATES:""")
+
+        if groupme_summary and groupme_summary.strip():
+            st.markdown(groupme_summary)
+        else:
+            st.info("No important updates from group chats.")
+
+        with st.expander("View all recent messages"):
+            groups = messages['GROUP_NAME'].unique()
+            for group in groups:
+                group_msgs = messages[messages['GROUP_NAME'] == group]
+                st.markdown(f"**{group}** ({len(group_msgs)} messages)")
                 for _, msg in group_msgs.iterrows():
                     likes = f" {msg['LIKES_COUNT']} likes" if msg['LIKES_COUNT'] > 0 else ""
                     time_str = pd.Timestamp(msg['SENT_AT']).strftime('%I:%M %p') if msg['SENT_AT'] else ""
-                    st.markdown(f"**{msg['SENDER_NAME']}** [{time_str}]: {msg['MESSAGE_TEXT']}{likes}")
+                    st.caption(f"{msg['SENDER_NAME']} [{time_str}]: {msg['MESSAGE_TEXT']}{likes}")
+                st.markdown("---")
 
 with tab_actions:
     st.subheader("Action Items")
