@@ -1,6 +1,7 @@
-credentials.json
-token.json
-.env
+.streamlit/secrets.toml
 __pycache__/
 *.pyc
 venv/
+rsa_key.p8
+rsa_key.pub
+snowflake.yml
