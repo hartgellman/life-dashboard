@@ -26,7 +26,8 @@ def get_connection():
     return snowflake.connector.connect(
         account=st.secrets["snowflake"]["account"],
         user=st.secrets["snowflake"]["user"],
-        password=st.secrets["snowflake"]["password"],
+        authenticator="programmatic_access_token",
+        token=st.secrets["snowflake"]["token"],
         warehouse=st.secrets["snowflake"]["warehouse"],
         database=st.secrets["snowflake"]["database"],
         schema=st.secrets["snowflake"]["schema"],
