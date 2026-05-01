@@ -488,7 +488,7 @@ HEADS UP:""")
 
 with tab_messages:
     st.subheader("GroupMe Highlights")
-    st.caption("AI-extracted updates from your group chats")
+    st.caption("Summary of what's being discussed in your group chats")
     messages = run_query(f"""
         SELECT GROUP_NAME, SENDER_NAME, MESSAGE_TEXT, LIKES_COUNT, SENT_AT
         FROM {DB_SCHEMA}.GROUPME_MESSAGES
@@ -499,46 +499,31 @@ with tab_messages:
     if messages.empty:
         st.info("No recent messages")
     else:
-        msg_text = ""
-        for _, msg in messages.iterrows():
-            time_str = pd.Timestamp(msg['SENT_AT']).strftime('%b %d %I:%M %p') if msg['SENT_AT'] else ""
-            msg_text += f"[{msg['GROUP_NAME']}] {msg['SENDER_NAME']} ({time_str}): {str(msg['MESSAGE_TEXT'])[:150]}\n"
+        groups = messages['GROUP_NAME'].unique()
+        for group in groups:
+            group_msgs = messages[messages['GROUP_NAME'] == group]
+            msg_text = ""
+            for _, msg in group_msgs.iterrows():
+                msg_text += f"{str(msg['MESSAGE_TEXT'])[:200]}\n"
 
-        groupme_summary = cortex_complete(f"""You are Hart Gellman's personal assistant reviewing GroupMe messages from parent groups, family chats, and friend groups.
+            group_summary = cortex_complete(f"""Summarize this GroupMe thread for Hart Gellman in 1-3 sentences. What was discussed? Is there anything Hart needs to know or do?
 
-EXTRACT ONLY messages about:
-- Schedule changes (practice cancelled, game moved, time change)
-- New events or activities announced
-- Teacher/staff birthdays or appreciation days
-- RSVPs needed or deadlines
-- Important logistics (carpool changes, aftercare updates, field assignments)
-- Party/event planning that requires action
+RULES:
+- Write a brief, natural summary of the conversation (not individual messages)
+- Don't mention who said what or timestamps
+- If there's something Hart needs to act on, end with "Note:" followed by the action
+- If the thread is just casual/social with nothing notable, say "Nothing notable"
+- Skip expired polls, bot messages, and system messages
 
-IGNORE: Casual chat, "thank you" messages, reactions, expired polls, general banter
-
-Format as bullet points grouped by topic. Include the group name and key details.
-If nothing noteworthy, say "No important updates from group chats."
-
+GROUP: {group}
 MESSAGES:
-{msg_text[:3500]}
+{msg_text[:1500]}
 
-KEY UPDATES:""")
+SUMMARY:""")
 
-        if groupme_summary and groupme_summary.strip():
-            st.markdown(groupme_summary)
-        else:
-            st.info("No important updates from group chats.")
-
-        with st.expander("View all recent messages"):
-            groups = messages['GROUP_NAME'].unique()
-            for group in groups:
-                group_msgs = messages[messages['GROUP_NAME'] == group]
-                st.markdown(f"**{group}** ({len(group_msgs)} messages)")
-                for _, msg in group_msgs.iterrows():
-                    likes = f" {msg['LIKES_COUNT']} likes" if msg['LIKES_COUNT'] > 0 else ""
-                    time_str = pd.Timestamp(msg['SENT_AT']).strftime('%I:%M %p') if msg['SENT_AT'] else ""
-                    st.caption(f"{msg['SENDER_NAME']} [{time_str}]: {msg['MESSAGE_TEXT']}{likes}")
-                st.markdown("---")
+            if group_summary and group_summary.strip() and "nothing notable" not in group_summary.lower():
+                with st.expander(f"**{group}**"):
+                    st.markdown(group_summary)
 
 with tab_actions:
     st.subheader("Action Items")
