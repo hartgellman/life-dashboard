@@ -292,6 +292,44 @@ tab_today, tab_week, tab_messages, tab_actions, tab_upload, tab_ask = st.tabs(
 )
 
 with tab_today:
+    school_emails = run_query(f"""
+        SELECT SENDER, SUBJECT, SNIPPET, RECEIVED_AT
+        FROM {DB_SCHEMA}.SCHOOL_EMAILS
+        WHERE RECEIVED_AT >= DATEADD('day', -7, CURRENT_TIMESTAMP())
+        ORDER BY RECEIVED_AT DESC
+    """)
+
+    if not school_emails.empty:
+        st.subheader("🏫 School Alerts")
+        school_text = ""
+        for _, se in school_emails.iterrows():
+            sender = str(se['SENDER']).split('<')[0].strip()
+            school_text += f"From: {sender} | Subject: {se['SUBJECT']} | {str(se['SNIPPET'])[:300]}\n\n"
+
+        school_summary = cortex_complete(f"""You are Hart Gellman's assistant summarizing school emails from Monte Cassino (his kids Harrison and Hunter attend there).
+
+Summarize the key points from these recent school emails. Focus on:
+- Upcoming events, deadlines, or dates parents need to know
+- Action items (forms to fill out, supplies to bring, sign-ups needed, volunteer requests)
+- Health/nurse visits (briefly note what happened)
+- Schedule changes or important announcements
+
+Format as concise bullet points grouped by topic. Skip Facebook notifications and social media updates.
+If an email requires Hart to DO something, start that bullet with "ACTION:" so it stands out.
+
+Today is {now.strftime('%A, %B %d, %Y')}.
+
+EMAILS (most recent first):
+{school_text[:3500]}
+
+SUMMARY:""")
+
+        if school_summary and school_summary.strip():
+            st.markdown(school_summary)
+        else:
+            st.info("No notable school updates this week.")
+        st.divider()
+
     if is_evening:
         st.subheader("Tomorrow")
         target_date = (now + timedelta(days=1)).strftime('%Y-%m-%d')
@@ -674,6 +712,16 @@ with tab_ask:
             for _, a in context_actions.iterrows():
                 due = f" (due {a['DUE_DATE']})" if a['DUE_DATE'] else ""
                 context_str += f"- [{a['PRIORITY']}] {a['TITLE']}{due}\n"
+
+        context_school = run_query(f"""
+            SELECT SENDER, SUBJECT, SNIPPET FROM {DB_SCHEMA}.SCHOOL_EMAILS 
+            ORDER BY RECEIVED_AT DESC LIMIT 10
+        """)
+        context_str += "\nSCHOOL EMAILS (Monte Cassino - recent):\n"
+        if not context_school.empty:
+            for _, s in context_school.iterrows():
+                sender = str(s['SENDER']).split('<')[0].strip()
+                context_str += f"- From {sender}: {s['SUBJECT']} — {str(s['SNIPPET'])[:150]}\n"
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
