@@ -5,3 +5,6 @@ venv/
 rsa_key.p8
 rsa_key.pub
 snowflake.yml
+credentials.json
+token.json
+output/
