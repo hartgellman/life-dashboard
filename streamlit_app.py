@@ -112,14 +112,16 @@ def ask_ai(question, context):
     prompt = f"""You are a helpful personal assistant for Hart Gellman. Answer the question based ONLY on the data provided below.
 
 RULES:
-- Be concise and direct (1-3 sentences max)
-- If the answer is a time, include the day of the week
+- If the question asks about a time range (e.g., "next week", "this weekend"), list ALL relevant events — do not cherry-pick or summarize down to just a few
+- If the question is specific (e.g., "what time is soccer"), be concise (1-2 sentences)
+- If an event spans multiple days, mention the full date range
+- Include school events (Monte Cassino), kids' activities, and family events — these are important
 - If you cannot find the answer in the data, say "I don't see that in your upcoming schedule/emails/messages"
 - Use relative time references when helpful (e.g., "this Saturday" instead of just the date)
 - Today is {now.strftime('%A, %B %d, %Y')} and the current time is {now.strftime('%I:%M %p')} Central Time
 
 DATA:
-{context[:4000]}
+{context[:6000]}
 
 QUESTION: {question}
 
