@@ -490,12 +490,11 @@ HEADS UP:""")
 
 with tab_messages:
     st.subheader("GroupMe Highlights")
-    st.caption("Summary of what's being discussed in your group chats")
+    st.caption("Summary of group chats from the past 5 days")
     messages = run_query(f"""
         SELECT GROUP_NAME, SENDER_NAME, MESSAGE_TEXT, LIKES_COUNT, SENT_AT
         FROM {DB_SCHEMA}.GROUPME_MESSAGES
         ORDER BY SENT_AT DESC
-        LIMIT 60
     """)
 
     if messages.empty:
@@ -508,24 +507,25 @@ with tab_messages:
             for _, msg in group_msgs.iterrows():
                 msg_text += f"{str(msg['MESSAGE_TEXT'])[:200]}\n"
 
-            group_summary = cortex_complete(f"""Summarize this GroupMe thread for Hart Gellman in 1-3 sentences. What was discussed? Is there anything Hart needs to know or do?
+            group_summary = cortex_complete(f"""Summarize this GroupMe group chat for Hart Gellman in 2-4 bullet points. What was discussed? Anything Hart needs to know or do?
 
 RULES:
-- Write a brief, natural summary of the conversation (not individual messages)
+- Use short bullet points (not paragraphs)
 - Don't mention who said what or timestamps
-- If there's something Hart needs to act on, end with "Note:" followed by the action
-- If the thread is just casual/social with nothing notable, say "Nothing notable"
-- Skip expired polls, bot messages, and system messages
+- Focus on: what happened, what's coming up, any decisions or actions needed
+- If there's something Hart needs to act on, start that bullet with "ACTION:"
+- Skip expired polls, bot messages, system messages, and "thank you" replies
 
 GROUP: {group}
 MESSAGES:
 {msg_text[:1500]}
 
-SUMMARY:""")
+BULLETS:""")
 
             if group_summary and group_summary.strip() and "nothing notable" not in group_summary.lower():
-                with st.expander(f"**{group}**"):
-                    st.markdown(group_summary)
+                st.markdown(f"**{group}**")
+                st.markdown(group_summary)
+                st.markdown("")
 
 with tab_actions:
     st.subheader("Action Items")
